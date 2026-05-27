@@ -19,83 +19,6 @@
 #include "config.h"
 
 
-/* kolejność:
-  setLed                          w
-  buzzerOn / buzzerOff            w initGpio, handleDebugMode, handleFlightMode
-
-  init: GPIO, dip, spio, gps, lsm, adxl, bmp
-
-  XSolenoidOn / XSolenoidOff      w updateSolenoid
-  systemReset                     w loraHandleCommand
-  systemSleep                     w loraHandleCommand, handleSleepMode
-  setSystemMode                   w init
-  printSystemMode                 w 
-  printFlightMode                 w 
-
-  readBatteryVoltage              w readSensorData
-  readGpsData                     w readSensorData
-  readLsmData                     w readSensorData
-  readAdxlData                    w readSensorData
-  readBmpData                     w readSensorData
-  readSensorData                  w superloop
-  filterAcceleration              po readSensorData
-  filterGyro                      po readSensorData
-  filterLowPass  | float filterLowPass(float raw, float prev, float alpha) { return alpha * raw + (1 - alpha) * prev; }
-
-  calculateAltitude               po readSensorData
-  calculateOrientation            po readSensorData
-  calculateVerticalVelocity       po calculateAltitude
-  fuseBMPAndIMU                   po filtrach    | fusedAltitude = alpha * (bmpAltitude) + (1 - alpha) * (prevFused + verticalAccel * dt)
-  kalmanFilter                    po fuseBMPAndIMU
-
-  loraInit                        w setup
-  loraPrintStatus                 w setup
-  loraPrepareMsg                  w loraSendPacket
-  loraSendString                  w 
-  loraSendPacket                  w handleFlightMode
-  loraStartListening              w superloop
-  loraSendGpsOffset               w loraHandleCommand
-  loraHandleCommand               w loraCheckRadio
-  loraCheckRadio                  w superloop
-
-  flashInit                       w init
-  flashFindNextFileNumber         po flashInit
-  flashOpenNewFile                w handleFlightMode
-  flashWriteData                  w superloop
-  flashWriteRocketData            w superloop
-  flashFlushBuffer                przed resetem i co jakiś czas
-  flashCloseFile                  po  =======  taczdałn
-  flashRecoverAfterReset          podczas boot
-  flashDumpFileList               w handleDumpMode
-  flashDumpFileData               w handleDumpMode
-  flashDumpLastFile               w handleDumpMode
-
-  ? checkDeploymentConditions    w detectApogee
-  drogueParashuteOpen             w detectApogee
-  mainParashuteOpen               w descent
-  detectLaunch                    w updateFlightState
-  detectBurnout                   w updateFlightState
-  detectApogee                    w updateFlightState
-  detectLanding                   w updateFlightState
-  updateFlightState               w superloop
-
-  watchdog                        w superloop
-  updateBuzzer                    w superloop
-  updateStatus                    w superloop
-  updateSolenoid                  w superloop
-  setOffsets                      w init
-  prepareOffsetsMsg               w loraHandleComand
-
-  handleDebugMode                 w superloop
-  handleFlightMode                w superloop
-  handleDumpMode                  w superloop
-  handleSleepMode                 w superloop
-
-  systemInit
-  systemLoop
-*/
-
-
 // It must be here for the RadioLib module to function properly
 inline volatile bool operationDone = false;
 inline void setOperationFlag(void) { operationDone = true; }
@@ -303,29 +226,30 @@ private:
   void readSensorsData();
   void printData();
   void setOffsets();
-  String prepareOffsetsMsg();
-  String prepareDataLineMsg();
+  void prepareOffsetsMsg(char* buffer, size_t bufferSize);
+  void prepareDataLineMsg(char* buffer, size_t bufferSize);
   void filterAcceleration();  /// nigdzie nie używane
   void filterGyro();  /// nigdzie nie używane
   void calculateOrientation();  /// nigdzie nie używane
   void fuseBMPAndIMU();  /// nigdzie nie używane
   bool initLora();
-  String prepareLoraStatusMsg();
+  void prepareLoraStatusMsg(char* buffer, size_t bufferSize);
   void preparePacket();
   void sendPacket();
-  void transmit(String& msg);
-  void transmit(const uint8_t *msg, const size_t len);
+  void transmit(const uint8_t* msg, const size_t len);
+  void transmit(const uint8_t *msg);
+  void transmit(const char* msg, size_t len);
   void startListening();
-  void handleCommand(const String& command);  /// trzeba pododawać komendy
+  void handleCommand(const char* command);
   void checkRadio();
   void sendGpsOffset();
   bool initFlash();
-  bool flashFindNextFileNumber();
+  bool flashFindNextFileNumber(char* fileName, size_t bufferSize);
   bool flashOpenNewFile();
-  void flashWriteString(const String& msg);
+  void flashWriteString(const char* msg);
   void flashFlushBuffer();
   void flashCloseFile();
-  bool flashRecoverAfterReset();  /// wydaje mi się, że trzeba by było zmienić bo te funkcje istnieją ?
+  bool flashRecoverAfterReset();
   void flashDumpFileList();
   void flashDumpFileData(const uint16_t fileNumber);
   void flashDumpLastFile();
@@ -340,66 +264,13 @@ private:
   void updateFlightState();
   void initWatchdog();
   void watchdog();
+
   void handleDebugMode();  /// do zmieniania w locie
   void handleFlightMode();
   void handleDumpMode();  /// nie wiem co tu się dzieje obecnie
   void handleSleepMode();  /// chyba będzie ok
   void handleModes(const uint32_t now);
 
-  
-/*
-  // === Metody prywatne ===
-  void readModeFromSwitch();
-  void printSystemMode();
-  void printData();
-  void systemReset();
-  void updateBuzzer() {};
-  void watchdog() {};
-  
-  // Inicjalizacja komponentów
-  bool initSPI();
-  bool initLSM();
-  bool initADXL375();
-  bool initBMP388();
-  bool initFlash();
-  bool initLoRa();
-  bool initGPS();
-  bool initGPIO();
-  bool initDIPSwitch();
-
-  // Odczyt danych
-  void setOffsets();
-  void handleLsm();
-  void handleBmp();
-  void handleAdxl();
-  void handleGPS();
-  void handleBattery();
-
-  // Obsługa radia
-  void startListening();
-  void printRadioStatus();
-  void handleCommand(String);
-  void checkRadio();
-  void transmit(String) {};
-  void transmit(uint8_t*, size_t) {};
-  void prepareMsg() {};
-  void sendMsg() {};
-  void sendGpsOffset() {};
-
-  String prepareOffsetsMsg() {};
-  String prepareDataLineMsg() {};
-  bool flashFindNextFileNumber() {};
-  bool flashOpenNewFile() {};
-  bool flashWriteData(const String&) {};
-  void writeRocketData() {};
-  
-  // Metody dla poszczególnych trybów
-  void handleDebugMode();
-  void handleFlightMode();
-  void handleDumpMode();
-  void handleSleepMode();
-
-*/
   
 public:
   Rakieta();
@@ -408,14 +279,5 @@ public:
   void init();
   void loop();
 };
-
-/*
-    void parashuteOpen();                      // Initiates the parachute deployment procedure (activates solenoid)
-    void activateSolenoid(uint8_t, uint32_t);  // Activates a solenoid valve with the specified number of pulses and pulse timing
-    void updateSolenoid();                     // Updates solenoid state machine and pulse timing (call frequently to manage pulses)
-    void updateStatus();                       // Updates the rocket's flight status/state based on current sensor data
-
-    void setFlightMode(bool);                  // Sets the inFlight flag (true = flight mode enabled, false = ground mode)
-*/
 
 #endif  // RAKIETA_H
